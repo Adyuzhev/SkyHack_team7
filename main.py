@@ -1,5 +1,7 @@
-import pandas as pd
 from transformers import AutoTokenizer, T5ForConditionalGeneration
+import streamlit as st
+import pandas as pd
+
 
 model_name = "IlyaGusev/rut5_base_sum_gazeta"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -7,16 +9,13 @@ model = T5ForConditionalGeneration.from_pretrained(model_name)
 
 df = pd.read_excel('./data.xlsx', index_col=0)
 
-str_prod = input()
-
-
 def update_input(input_val):
     list_prod = [x.strip(' ').lower() for x in input_val.split(',')]
     return list_prod
 
+str_prod = st.text_input('Введите еду')
 
 new_val = update_input(str_prod)
-
 
 def to_dict_val(name_prod):
     new = {}
@@ -28,9 +27,10 @@ def to_dict_val(name_prod):
                 new[j.strip(' ')].append(i)
     return new
 
-
 dict_val = to_dict_val(new_val)
 
+
+st.title('Вредность еды')
 
 def pred_res(name_prod, dict_val):
     result = []
@@ -60,4 +60,7 @@ def pred_res(name_prod, dict_val):
 
     return result
 
-print(*pred_res(new_val, dict_val))
+result = st.button('Рассчитать')
+if result:
+
+    st.write(*pred_res(new_val, dict_val))
