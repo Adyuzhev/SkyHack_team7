@@ -1,21 +1,11 @@
 from transformers import AutoTokenizer, T5ForConditionalGeneration
 import streamlit as st
+import matplotlib.pyplot as plt
 import pandas as pd
-
-
-model_name = "IlyaGusev/rut5_base_sum_gazeta"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = T5ForConditionalGeneration.from_pretrained(model_name)
-
-df = pd.read_excel('./data.xlsx', index_col=0)
 
 def update_input(input_val):
     list_prod = [x.strip(' ').lower() for x in input_val.split(',')]
     return list_prod
-
-str_prod = st.text_input('Введите еду')
-
-new_val = update_input(str_prod)
 
 def to_dict_val(name_prod):
     new = {}
@@ -26,11 +16,6 @@ def to_dict_val(name_prod):
             else:
                 new[j.strip(' ')].append(i)
     return new
-
-dict_val = to_dict_val(new_val)
-
-
-st.title('Вредность еды')
 
 def pred_res(name_prod, dict_val):
     result = []
@@ -56,11 +41,47 @@ def pred_res(name_prod, dict_val):
         )[0]
 
         summary = tokenizer.decode(output_ids, skip_special_tokens=True)
-        result.append(f'{i.capitalize()} {summary.lower()}')
+        result.append(f'{i.capitalize()}: {summary.lower()}')
 
     return result
 
+@st.cache_resource
+def load_model():
+    model_name = "IlyaGusev/rut5_base_sum_gazeta"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = T5ForConditionalGeneration.from_pretrained(model_name)
+    return tokenizer, model
+
+
+st.title('Вредность еды')
+
+tokenizer, model = load_model()
+
+df = pd.read_excel('./data.xlsx', index_col=0)
+
+str_prod = st.text_input('Введите еду')
+
 result = st.button('Рассчитать')
 if result:
+    for i in pred_res(update_input(str_prod), to_dict_val(update_input(str_prod))):
+        st.write(i)
 
-    st.write(*pred_res(new_val, dict_val))
+    dict_color = {'Очень высокая': 'maroon',
+                  'Высокая': 'red',
+                  'Средняя': 'orange',
+                  'Низкая': 'limegreen',
+                  'Очень низкая': 'lime',
+                  'Безопасен': 'lawngreen'}
+
+    for i in update_input(str_prod):
+        labels = []
+        colors = []
+
+        for j in df[df['Применение'].str.lower().str.contains(i)][['Опасность']].value_counts().to_frame().reset_index()['Опасность']:
+            labels.append(j)
+            colors.append(dict_color[j])
+
+        fig1, ax1 = plt.subplots(figsize = (6, 10))
+        ax1.pie(df[df['Применение'].str.lower().str.contains(i)]['Опасность'].to_frame().value_counts(), labels = labels, colors=colors, autopct='%1.2f%%', textprops={'fontsize': 14})
+        plt.title(label=f'Степень вреда химических добавок: {i}', fontdict={"fontsize": 16}, pad=20)
+        st.pyplot(fig1)
